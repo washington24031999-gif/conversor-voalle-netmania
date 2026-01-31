@@ -60,4 +60,39 @@ def extrair_dados(uploaded_files):
             if extensao == "csv":
                 df_temp = pd.read_csv(f, sep=None, engine='python', encoding='utf-8-sig')
             else:
-                df_temp = pd.read_excel
+                df_temp = pd.read_excel(f)
+            
+            # Se o Excel vier com as colunas 'bagunçadas' como no PDF, tratamos linha a linha
+            for _, row in df_temp.iterrows():
+                # Tentamos identificar se os dados estão concentrados nas primeiras colunas
+                c1 = str(row.iloc[0]) if len(row) > 0 else ""
+                c2 = str(row.iloc[1]) if len(row) > 1 else ""
+                c4 = str(row.iloc[3]) if len(row) > 3 else ""
+                
+                # Aplica a mesma limpeza e regex do PDF
+                res = extrair_logica_voalle(limpar(c1), limpar(c2), limpar(c4))
+                todos_dados.append(res)
+            
+    return pd.DataFrame(todos_dados)
+
+files = st.file_uploader("Arquivos (PDF/Excel)", type=["pdf", "xlsx", "xls", "csv"], accept_multiple_files=True)
+
+if files:
+    if st.button("🚀 Processar e Padronizar"):
+        df_final = extrair_dados(files)
+        
+        if not df_final.empty:
+            st.success(f"Pronto! {len(df_final)} registros processados.")
+            st.dataframe(df_final)
+            
+            output = BytesIO()
+            # Trocado para openpyxl para evitar o erro ModuleNotFoundError
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df_final.to_excel(writer, index=False)
+            
+            st.download_button(
+                label="📥 Baixar Excel Padronizado", 
+                data=output.getvalue(), 
+                file_name="Relatorio_Voalle_Unificado.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
